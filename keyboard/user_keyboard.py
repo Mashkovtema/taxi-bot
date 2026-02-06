@@ -85,14 +85,14 @@ async def application_buttons(with_passenger: bool, time: str, application_id: i
         btn_passenger = types.InlineKeyboardButton(text='С пассажиром ❌', callback_data=f'select-passenger_1_{application_id}')
 
     btn_send = types.InlineKeyboardButton(text='Отправить ответ', callback_data=f'send-answer_{application_id}')
-    btn_back = types.InlineKeyboardButton(text='Назад ◀️', callback_data=f'confirm-delete-appl_{application_id}_no')
+    btn_delete = types.InlineKeyboardButton(text='Удалить сообщение', callback_data='delete-message')
 
     markup.inline_keyboard.append([btn_1, btn_2, btn_3])
     markup.inline_keyboard.append([btn_4, btn_5])
     markup.inline_keyboard.append([btn_6])
     markup.inline_keyboard.append([btn_passenger])
     markup.inline_keyboard.append([btn_send])
-    markup.inline_keyboard.append([btn_back])
+    markup.inline_keyboard.append([btn_delete])
     return markup
 
 

@@ -112,7 +112,7 @@ async def handle_message_in_groups(message: types.Message, bot: Bot, state: FSMC
 
     application_id = await user_requests.add_new_application(group_id, group_name, address, client_user_id, client_username, group_username, message_id)
     drivers_ids_list = await user_requests.get_all_drivers_ids()
-    markup = await user_keyboard.confirm_or_delete_application(application_id)
+    markup = await user_keyboard.application_buttons(False, '1-3', application_id)
 
     text = f'<b>! Новая заявка !</b>\n\n👥 Группа: <a href="https://t.me/{group_username}">{group_name}</a>\n🏠 {address}'
     for driver_id in drivers_ids_list:
@@ -126,46 +126,10 @@ async def handle_message_in_groups(message: types.Message, bot: Bot, state: FSMC
         pass
 
 
-@router.callback_query(F.data.startswith('delete-message_'))
-async def cancel_application(callback: types.CallbackQuery):
-    """Отмена заявки"""
-    logging.info('cancel_application')
-    application_id = str(callback.data).split('_')[1]
-    markup = await user_keyboard.yes_or_no_buttons(f'confirm-delete-appl_{application_id}')
-    await callback.message.edit_text('Вы уверены что хотите отменить заявку?', reply_markup=markup)
-
-
-@router.callback_query(F.data.startswith('confirm-delete-appl_'))
-async def delete_application(callback: types.CallbackQuery, state: FSMContext):
-    """Подтверждение удаление заявки"""
-    logging.info('delete_application')
-    flag = str(callback.data).split('_')[2]
-    if flag == 'yes':
-        await callback.message.delete()
-        await state.clear()
-    else:
-        application_id = int(str(callback.data).split('_')[1])
-        application = await user_requests.get_application_by_id(application_id)
-        application_id = application['id']
-        group_username = application['group_username']
-        group_name = application['group_name']
-        address = application['address']
-
-        markup = await user_keyboard.confirm_or_delete_application(application_id)
-        text = f'<b>! Новая заявка !</b>\n\n👥 Группа: <a href="https://t.me/{group_username}">{group_name}</a>\n🏠 {address}'
-        await callback.message.edit_text(text=text, reply_markup=markup, disable_web_page_preview=True)
-
-
-@router.callback_query(F.data.startswith('confirm-application_'))
-async def confirm_application(callback: types.CallbackQuery, state: FSMContext):
-    """Подтверждение заявки"""
-    logging.info('confirm_application')
-    application_id = int(str(callback.data).split('_')[1])
-    application = await user_requests.get_application_by_id(application_id)
-    markup = await user_keyboard.application_buttons(False, '1-3', application_id)
-    await state.update_data(with_passenger=False)
-    await state.update_data(time='1-3')
-    await callback.message.edit_text(f'🏠 {application["address"]}\n\nВыберите время ожидания (в минутах) 👇', reply_markup=markup)
+@router.callback_query(F.data == 'delete-message')
+async def delete_message(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await state.clear()
 
 
 @router.callback_query(F.data.startswith('select-time_'))
@@ -177,11 +141,15 @@ async def select_application_time(callback: types.CallbackQuery, state: FSMConte
     state_data = await state.get_data()
 
     application = await user_requests.get_application_by_id(application_id)
-    markup = await user_keyboard.application_buttons(state_data['with_passenger'], time, application_id)
+    try:
+        markup = await user_keyboard.application_buttons(state_data['with_passenger'], time, application_id)
+    except:
+        markup = await user_keyboard.application_buttons(False, time, application_id)
 
     await state.update_data(time=time)
     try:
-        await callback.message.edit_text(f'🏠 {application["address"]}\n\nВыберите время ожидания (в минутах) 👇', reply_markup=markup)
+        text = f'<b>! Новая заявка !</b>\n\n👥 Группа: <a href="https://t.me/{application["group_username"]}">{application["group_name"]}</a>\n🏠 {application["address"]}'
+        await callback.message.edit_text(text, reply_markup=markup)
     except Exception as e:
         await callback.answer()
 
@@ -195,10 +163,14 @@ async def select_with_passenger(callback: types.CallbackQuery, state: FSMContext
     state_data = await state.get_data()
 
     application = await user_requests.get_application_by_id(application_id)
-    markup = await user_keyboard.application_buttons(with_passenger, state_data['time'], application_id)
+    try:
+        markup = await user_keyboard.application_buttons(with_passenger, state_data['time'], application_id)
+    except:
+        markup = await user_keyboard.application_buttons(with_passenger, '1-3', application_id)
 
     await state.update_data(with_passenger=with_passenger)
-    await callback.message.edit_text(f'🏠 {application["address"]}\n\nВыберите время ожидания (в минутах) 👇', reply_markup=markup)
+    text = f'<b>! Новая заявка !</b>\n\n👥 Группа: <a href="https://t.me/{application["group_username"]}">{application["group_name"]}</a>\n🏠 {application["address"]}'
+    await callback.message.edit_text(text, reply_markup=markup)
 
 
 @router.callback_query(F.data.startswith('send-answer_'))
@@ -209,18 +181,24 @@ async def send_application_answer(callback: types.CallbackQuery, state: FSMConte
     application_id = int(str(callback.data).split('_')[1])
 
     state_data = await state.get_data()
-    driver_data = await user_requests.get_driver_data(user_id)
-    check_application = await user_requests.confirm_driver_application(driver_data['user_id'],
-                                                                       application_id,
-                                                                       driver_data['driver_name'],
-                                                                       driver_data['username'],
-                                                                       driver_data['car_description'],
-                                                                       state_data['time'],
-                                                                       state_data['with_passenger'])
-    if check_application:
-        application_data = await user_requests.get_application_by_id(application_id)
-        markup = await user_keyboard.confirm_or_not_application_user(application_id)
 
+    if 'with_passenger' not in state_data.keys():
+        state_data['with_passenger'] = False
+    if 'time' not in state_data.keys():
+        state_data['time'] = '1-3'
+
+    driver_data = await user_requests.get_driver_data(user_id)
+    check = await user_requests.confirm_driver_application(driver_data['user_id'],
+                                                   application_id,
+                                                   driver_data['driver_name'],
+                                                   driver_data['username'],
+                                                   driver_data['car_description'],
+                                                   state_data['time'],
+                                                   state_data['with_passenger'])
+
+    application_data = await user_requests.get_application_by_id(application_id)
+    markup = await user_keyboard.confirm_or_not_application_user(application_id)
+    if check:
         if application_data['driver_username'] != '---':
             text = (f'Водитель найден ✅\n\n'
                     f'<b>{application_data["address"]}</b>\n\n'
@@ -248,8 +226,6 @@ async def send_application_answer(callback: types.CallbackQuery, state: FSMConte
         await state.clear()
     else:
         await callback.message.edit_text('Заявка уже принята другим водителем ❌')
-        await callback.answer()
-        await state.clear()
 
 
 @router.callback_query(F.data.startswith('confirm-application-user_'))

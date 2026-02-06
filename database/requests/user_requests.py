@@ -113,7 +113,7 @@ async def add_new_application(group_id: int, group_name: str, address: str, clie
         return return_id
 
 
-async def get_application_by_id(id_: int) -> dict:
+async def get_application_by_id(id_: int):
     """Получение заявки по id"""
     logging.info('get_application_by_id')
     async with async_session() as session:
@@ -133,18 +133,18 @@ async def confirm_driver_application(driver_user_id: int,
     async with async_session() as session:
         application = await session.scalar(select(Applications).where(Applications.id == application_id))
         if application.status == 'new':
-            application.status = 'confirm_driver'
+            application.status = 'confirmed_driver'
             application.driver_user_id = driver_user_id
             application.driver_username = driver_username
             application.driver_name = driver_name
             application.car_name = car
             application.time = time
             application.with_passenger = with_passenger
-
             await session.commit()
             return True
         else:
             return False
+
 
 
 async def confirm_or_not_application_by_user(application_id: int, status: str):
