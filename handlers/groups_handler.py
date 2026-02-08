@@ -110,20 +110,23 @@ async def handle_message_in_groups(message: types.Message, bot: Bot, state: FSMC
     client_user_id = message.from_user.id
     client_username = message.from_user.username
 
-    application_id = await user_requests.add_new_application(group_id, group_name, address, client_user_id, client_username, group_username, message_id)
-    drivers_ids_list = await user_requests.get_all_drivers_ids()
-    markup = await user_keyboard.application_buttons(False, '1-3', application_id)
+    if len(str(address).split(' ')) >= 2:
+        application_id = await user_requests.add_new_application(group_id, group_name, address, client_user_id, client_username, group_username, message_id)
+        drivers_ids_list = await user_requests.get_all_drivers_ids()
+        markup = await user_keyboard.application_buttons(False, '1-3', application_id)
 
-    text = f'<b>! Новая заявка !</b>\n\n👥 Группа: <a href="https://t.me/{group_username}">{group_name}</a>\n🏠 {address}'
-    for driver_id in drivers_ids_list:
+        text = f'<b>! Новая заявка !</b>\n\n👥 Группа: <a href="https://t.me/{group_username}">{group_name}</a>\n🏠 {address}'
+        for driver_id in drivers_ids_list:
+            try:
+                await bot.send_message(chat_id=driver_id, text=text, reply_markup=markup, disable_web_page_preview=True)
+            except:
+                pass
         try:
-            await bot.send_message(chat_id=driver_id, text=text, reply_markup=markup, disable_web_page_preview=True)
+            await bot.send_message(chat_id=group_id, text='Ищем вам водителя 🔎...', reply_to_message_id=message_id)
         except:
             pass
-    try:
-        await bot.send_message(chat_id=group_id, text='Ищем вам водителя 🔎...', reply_to_message_id=message_id)
-    except:
-        pass
+    else:
+        await bot.send_message(chat_id=group_id, text='', reply_to_message_id=message_id)
 
 
 @router.callback_query(F.data == 'delete-message')
